@@ -8,7 +8,7 @@ PyPi: https://pypi.org/project/cardboard/
 
 You can install the cardboard.py library using pip:
 
-`pip install cardboard`
+`pip install cardboard.py`
 
 ## Usage
 
@@ -34,7 +34,27 @@ For detailed documentation on how to use the cardboard.py library, please wait w
 
 ### Methods
 A list of methods you can call with either Cardboard or CardboardAsync.
-NONE
+- `.revoke_token(token:str)` (bool)
+- `.get_token(code:str)` (class AuthToken)
+    - `.token` (str)
+    - `.token_type` (str)
+    - `.refresh_token` (str)
+    - `.expires_in` (int)
+    - `._raw` (dict)
+- `.refresh_token(refresh_token:str)` (class AuthToken)
+    - `.token` (str)
+    - `.token_type` (str)
+    - `.refresh_token` (str)
+    - `.expires_in` (int)
+    - `._raw` (dict)
+- `.get_user(token:str)` (class User)
+    - BEING DEVELOPED, NOTHING HERE IS DONE. WILL RAISE AN ERROR.
+    - `.name` (str)
+    - `.id` (str)
+    - `.subdomain` (str)
+    - `.aliases` (list(class UserAlias))
+        - ??? (being developed)
+    - ??? (being developed)
 
 # License
 This project is licensed under the MIT License. See the LICENSE file for details.
