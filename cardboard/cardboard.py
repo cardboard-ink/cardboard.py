@@ -45,7 +45,7 @@ class Cardboard:
 
     def __init__(self, client_id:str, secret:str):
         self.client_id = client_id
-        self._base_url:str = "https://cardboard.ink/api/v1"
+        self._baseurl:str = "https://cardboard.ink/api/v1"
         self.secret:str = secret
         self.app_name:str = None
         self._session = requests.Session()
@@ -58,10 +58,10 @@ class Cardboard:
             Returns:
                 bool|list: [True, app_name] if everything is valid, else False.
             """
-            resp = requests.post(self._base_url+'/check', headers={'Content-Type': 'application/x-www-form-urlencoded'}, data={'client_id': self.client_id, 'client_secret': self.secret})
+            resp = requests.post(self._baseurl+'/check', headers={'Content-Type': 'application/x-www-form-urlencoded'}, data={'client_id': self.client_id, 'client_secret': self.secret})
             if resp.status_code != 200:
                 return False
-            return [True, resp.json()['app_name']]
+            return [True, resp.json()['name'], resp.json()['vanity']]
     
         self.__check_verify = lambda: __check_verify(self)
 
@@ -69,7 +69,7 @@ class Cardboard:
         if self._valid is False:
             raise CardboardException("Invalid credentials provided. (Is your ID and Secret correct?)")
         self.app_name = self._valid[1]
-        self.app_url = f"https://cardboard.ink/a/{self.app_name}"
+        self.app_url = f"https://cardboard.ink/a/{self._valid[2]}"
 
     class UserAlias:
         """
@@ -119,8 +119,8 @@ class Cardboard:
             _raw (dict): The raw API data.
         """
         def __init__(self, data):
-            self.bio:str|None = data["bio"]
-            self.tagline:str|None = data["tagLine"]
+            self.bio:str|None = data.get("bio")
+            self.tagline:str|None = data.get("tagLine")
             self._raw:dict = data
 
     class UserStatus:
@@ -165,15 +165,14 @@ class Cardboard:
             self.name:str = data["name"]
             self.id:str = data["id"]
             self.subdomain:str = data["subdomain"]
-            self.aliases:list = [self.UserAlias(data) for data in data["aliases"]]
+            self.aliases:list = [Cardboard.UserAlias(data) for data in data["aliases"]]
             self.avatar:str = data["avatar"]
             self.banner:str = data["banner"]
-            self.status:self.UserStatus = self.UserStatus(data["userStatus"])
+            self.status:Cardboard.UserStatus = Cardboard.UserStatus(data["userStatus"])
             self.moderationStatus:str|None = data["moderationStatus"]
-            self.aboutInfo:self.UserAbout = self.UserAbout(data["aboutInfo"])
+            self.aboutInfo:Cardboard.UserAbout = Cardboard.UserAbout(data["aboutInfo"])
             self.userTransientStatus:str|None = data["userTransientStatus"]
             self._raw:dict = data
-
 
     class AuthToken:
         """
@@ -207,7 +206,7 @@ class Cardboard:
             "client_secret": self.secret,
             "grant_type": grant_type,
         }
-        response = self._session.post(f"{self._baseurl}token", data=data)
+        response = self._session.post(f"{self._baseurl}/token", data=data)
         if response.status_code != 200:
             _handle_error(response)
         return self.AuthToken(response.json())
@@ -226,7 +225,7 @@ class Cardboard:
             "client_secret": self.secret,
             "grant_type": grant_type,
         }
-        response = self._session.post(f"{self._baseurl}token", data=data)
+        response = self._session.post(f"{self._baseurl}/token", data=data)
         if response.status_code != 200:
             _handle_error(response)
         return self.AuthToken(response.json())
@@ -243,7 +242,7 @@ class Cardboard:
             "client_secret": self.secret,
             "token": token,
         }
-        response = self._session.post(f"{self._baseurl}token/revoke", data=data)
+        response = self._session.post(f"{self._baseurl}/token/revoke", data=data)
         if response.status_code != 200:
             _handle_error(response)
 
@@ -255,7 +254,7 @@ class Cardboard:
             token (str): Your authorization token.
         """
         headers = {"Authorization": f"Bearer {token}"}
-        response = self._session.get(f"{self._baseurl}users/@me", headers=headers)
+        response = self._session.post(f"{self._baseurl}/users/@me", headers=headers)
         if response.status_code != 200:
             _handle_error(response)
         return self.User(response.json())

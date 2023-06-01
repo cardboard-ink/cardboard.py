@@ -12,14 +12,45 @@ You can install the cardboard.py library using pip:
 
 ## Usage
 
-Initialize the Cardboard or CardboardAsync class. Make sure to pass `client_secret` and `client_id`.
+Initialize the Cardboard or CardboardAsync class. Make sure to pass `secret` and `client_id`.
 
 You can now use the client to make requests.
 
-### Example
+### Examples
+These examples will use Flask. Install it with `pip install Flask`
 
 ```python
 # Python Example
+from flask import Flask, request, redirect, url_for, session, Response
+from cardboard import Cardboard
+
+app = Flask(__name__)
+cb = Cardboard(client_id='', secret='') # get these at https://cardboard.ink
+app.secret_key = 'hi' # set this to something secure, please.
+
+@app.route('/login')
+def login():
+    args = request.args
+    code = args.get('code')
+    if not code:
+        return redirect(cb.app_url)
+    try:
+        token = cb.get_token(code)
+    except:
+        return redirect(cb.app_url)
+    session['cardboard_token'] = token.token
+    return redirect(url_for('dashboard'))
+
+@app.route('/dashboard')
+def dashboard():
+    token = session.get('cardboard_token')
+    if not token:
+        return redirect(cb.app_url)
+    user = cb.get_user(token)
+    return Response(f'{user.name} (user id {user.id})', mimetype='text/plain')
+
+if __name__ == '__main__':
+    app.run('0.0.0.0', port=5000)
 ```
 
 ### Async Example

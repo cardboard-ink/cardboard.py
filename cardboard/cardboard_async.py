@@ -1,15 +1,16 @@
-import requests
-import aiohttp
+import aiohttp, asyncio
 from datetime import datetime
 from cardboard.Exceptions import Forbidden, Unauthorized, NotFound, InternalServerError, RateLimited, CardboardException
 
 
-def _handle_error(response):
+import aiohttp
+
+async def _handle_error(response):
     """
     Handles the error responses from API requests.
 
     Args:
-        response (requests.Response): The response object from the API request.
+        response (aiohttp.ClientResponse): The response object from the API request.
 
     Raises:
         Forbidden: If the response status code is 403.
@@ -19,24 +20,24 @@ def _handle_error(response):
         RateLimited: If the response status code is 429.
         CardboardException: If the response status code does not match any defined error codes.
     """
-    if response.status_code == 403:
-        raise Forbidden(f"{response.content.decode()}")
-    elif response.status_code == 401:
-        raise Unauthorized(f"{response.content.decode()}")
-    elif response.status_code == 404:
-        raise NotFound(f"{response.content.decode()}")
-    elif response.status_code == 500:
-        raise InternalServerError(f"{response.content.decode()}")
-    elif response.status_code == 429:
-        raise RateLimited(f"{response.content.decode()}")
-    elif 200 <= response.status_code < 300:
+    if response.status == 403:
+        raise Forbidden(await response.text())
+    elif response.status == 401:
+        raise Unauthorized(await response.text())
+    elif response.status == 404:
+        raise NotFound(await response.text())
+    elif response.status == 500:
+        raise InternalServerError(await response.text())
+    elif response.status == 429:
+        raise RateLimited(await response.text())
+    elif 200 <= response.status < 300:
         return False
     else:
-        raise CardboardException(f"{response.content.decode()}")
+        raise CardboardException(await response.text())
 
-class Cardboard:
+class CardboardAsync:
     """
-    Base Cardboard class for interacting with the Cardboard API.
+    Base asynchronous Cardboard class for interacting with the Cardboard API.
 
     Args:
         client_id (str): Your app's id.
@@ -46,31 +47,39 @@ class Cardboard:
 
     def __init__(self, client_id:str, secret:str):
         self.client_id = client_id
-        self._base_url:str = "https://cardboard.ink/api/v1"
+        self._baseurl:str = "https://cardboard.ink/api/v1"
         self.secret:str = secret
         self.app_name:str = None
-        self._session = requests.Session()
-        self._session.headers.update({"Content-Type": "application/x-www-form-urlencoded"})
+        self._session = aiohttp.ClientSession(headers={"Content-Type": "application/x-www-form-urlencoded"})
 
-        def __check_verify(self) -> bool|list:
+        async def __check_verify(self) -> bool|list:
             """
             Verifies authentication data. ID and Secret.
 
             Returns:
                 bool|list: [True, app_name] if everything is valid, else False.
             """
-            resp = requests.post(self._base_url+'/check', headers={'Content-Type': 'application/x-www-form-urlencoded'}, data={'client_id': self.client_id, 'client_secret': self.secret})
-            if resp.status_code != 200:
-                return False
-            return [True, resp.json()['app_name']]
+            url = self._baseurl + '/check'
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    url,
+                    data={'client_id': self.client_id, 'client_secret': self.secret},
+                    headers={'Content-Type': 'application/x-www-form-urlencoded'}
+                ) as response:
+                    return [
+                        True,
+                        (await response.json()).get('name'),
+                        (await response.json()).get('vanity')
+                    ] if response.status == 200 else False
+
     
         self.__check_verify = lambda: __check_verify(self)
 
-        self._valid = self.__check_verify()
+        self._valid = asyncio.run_coroutine_threadsafe(self.__check_verify(), asyncio.get_event_loop())
         if self._valid is False:
             raise CardboardException("Invalid credentials provided. (Is your ID and Secret correct?)")
         self.app_name = self._valid[1]
-        self.app_url = f"https://cardboard.ink/a/{self.app_name}"
+        self.app_url = f"https://cardboard.ink/a/{self._valid[2]}"
 
     class UserAlias:
         """
@@ -120,8 +129,8 @@ class Cardboard:
             _raw (dict): The raw API data.
         """
         def __init__(self, data):
-            self.bio:str|None = data["bio"]
-            self.tagline:str|None = data["tagLine"]
+            self.bio:str|None = data.get("bio")
+            self.tagline:str|None = data.get("tagLine")
             self._raw:dict = data
 
     class UserStatus:
@@ -166,15 +175,14 @@ class Cardboard:
             self.name:str = data["name"]
             self.id:str = data["id"]
             self.subdomain:str = data["subdomain"]
-            self.aliases:list = [self.UserAlias(data) for data in data["aliases"]]
+            self.aliases:list = [CardboardAsync.UserAlias(data) for data in data["aliases"]]
             self.avatar:str = data["avatar"]
             self.banner:str = data["banner"]
-            self.status:self.UserStatus = self.UserStatus(data["userStatus"])
+            self.status:CardboardAsync.UserStatus = CardboardAsync.UserStatus(data["userStatus"])
             self.moderationStatus:str|None = data["moderationStatus"]
-            self.aboutInfo:self.UserAbout = self.UserAbout(data["aboutInfo"])
+            self.aboutInfo:CardboardAsync.UserAbout = CardboardAsync.UserAbout(data["aboutInfo"])
             self.userTransientStatus:str|None = data["userTransientStatus"]
             self._raw:dict = data
-
 
     class AuthToken:
         """
@@ -194,7 +202,18 @@ class Cardboard:
             self.expires_in:int = data["expires_in"]
             self._raw:dict = data
 
-    def get_token(self, code:str) -> AuthToken:
+    async def _async_session_request_post_(self, url, data=None, headers=None):
+        """
+        Makes a post request.
+        """
+        if not headers:
+            async with self._session.post(url, data=data) as response:
+                return response
+        else:
+            async with self._session.post(url, data=data, headers=headers) as response:
+                return response
+
+    async def get_token(self, code:str) -> AuthToken:
         """
         Exchanges your initial code for an authorization token.
 
@@ -208,12 +227,12 @@ class Cardboard:
             "client_secret": self.secret,
             "grant_type": grant_type,
         }
-        response = self._session.post(f"{self._baseurl}token", data=data)
-        if response.status_code != 200:
-            _handle_error(response)
-        return self.AuthToken(response.json())
+        response = await self._async_session_request_post_(f"{self._baseurl}/token", data=data)
+        if response.status != 200:
+            await _handle_error(response)
+        return self.AuthToken(await response.json())
 
-    def refresh_token(self, refresh_token:str) -> AuthToken:
+    async def refresh_token(self, refresh_token:str) -> AuthToken:
         """
         Refreshes your authorization token. Your old authorization token and refresh token will no longer work after this.
 
@@ -227,12 +246,12 @@ class Cardboard:
             "client_secret": self.secret,
             "grant_type": grant_type,
         }
-        response = self._session.post(f"{self._baseurl}token", data=data)
-        if response.status_code != 200:
-            _handle_error(response)
-        return self.AuthToken(response.json())
+        response = await self._async_session_request_post_(f"{self._baseurl}/token", data=data)
+        if response.status != 200:
+            await _handle_error(response)
+        return self.AuthToken(await response.json())
 
-    def revoke_token(self, token:str) -> None:
+    async def revoke_token(self, token:str) -> None:
         """
         Revokes an authorization token. This also revokes your refresh token associated with this authorization token.
 
@@ -244,11 +263,11 @@ class Cardboard:
             "client_secret": self.secret,
             "token": token,
         }
-        response = self._session.post(f"{self._baseurl}token/revoke", data=data)
-        if response.status_code != 200:
-            _handle_error(response)
+        response = await self._async_session_request_post_(f"{self._baseurl}/token/revoke", data=data)
+        if response.status != 200:
+            await _handle_error(response)
 
-    def get_user(self, token:str) -> User:
+    async def get_user(self, token:str) -> User:
         """
         Fetches user data.
 
@@ -256,7 +275,7 @@ class Cardboard:
             token (str): Your authorization token.
         """
         headers = {"Authorization": f"Bearer {token}"}
-        response = self._session.get(f"{self._baseurl}users/@me", headers=headers)
-        if response.status_code != 200:
-            _handle_error(response)
-        return self.User(response.json())
+        response = await self._async_session_request_post_(f"{self._baseurl}/users/@me", headers=headers)
+        if response.status != 200:
+            await _handle_error(response)
+        return self.User(await response.json())
