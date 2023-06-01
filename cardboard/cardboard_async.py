@@ -57,7 +57,7 @@ class CardboardAsync:
             Verifies authentication data. ID and Secret.
 
             Returns:
-                bool|list: [True, app_name] if everything is valid, else False.
+                bool|list: [True, app_name, app_vanity] if everything is valid, else False.
             """
             url = self._baseurl + '/check'
             async with aiohttp.ClientSession() as session:

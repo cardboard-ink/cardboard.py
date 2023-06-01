@@ -64,7 +64,11 @@ For detailed documentation on the Cardboard API, read https://www.guilded.gg/Car
 For detailed documentation on how to use the cardboard.py library, please wait while we write it lol.
 
 ### Methods
-A list of methods you can call with either Cardboard or CardboardAsync.
+A list of methods/attributes you can call with either Cardboard or CardboardAsync.
+- `.app_url` (str)
+- `.app_name` (str)
+- `.secret` (str)
+- `.client_id` (str)
 - `.revoke_token(token:str)` (bool)
 - `.get_token(code:str)` (class AuthToken)
     - `.token` (str)

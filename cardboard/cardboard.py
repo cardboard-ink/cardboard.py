@@ -56,7 +56,7 @@ class Cardboard:
             Verifies authentication data. ID and Secret.
 
             Returns:
-                bool|list: [True, app_name] if everything is valid, else False.
+                bool|list: [True, app_name, app_vanity] if everything is valid, else False.
             """
             resp = requests.post(self._baseurl+'/check', headers={'Content-Type': 'application/x-www-form-urlencoded'}, data={'client_id': self.client_id, 'client_secret': self.secret})
             if resp.status_code != 200:
