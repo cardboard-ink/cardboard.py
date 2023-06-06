@@ -53,6 +53,36 @@ if __name__ == '__main__':
     app.run('0.0.0.0', port=5000)
 ```
 
+```python
+# Python Example using FlaskIntegration
+from flask import Flask, request, redirect, url_for, session, Response
+from cardboard import Cardboard, FlaskIntegration
+
+app = Flask(__name__)
+app.secret_key = 'hi' # set this to something secure, please.
+cb = Cardboard(client_id='', secret='') # get these at https://cardboard.ink
+cb.fi = FlaskIntegration(app=app, cardboard=cb) # make this class ONLY AFTER YOU SET A SECRET KEY for FLASK.
+
+@app.route('/login')
+@cb.fi.autologin
+def login(token):
+    session['cardboard_token'] = token.token
+    return redirect(url_for('dashboard'))
+
+@app.route('/dashboard')
+@cb.fi.logged_in('cardboard_token', check=True)
+def dashboard(token:str):
+    # v = cb.check_token(token)
+    # if not v:
+    #     return redirect(cb.app_url)
+    # uncomment above code if check=False
+    user = cb.get_user(token)
+    return Response(f'{user.name} (user id {user.id})', mimetype='text/plain')
+
+if __name__ == '__main__':
+    app.run('0.0.0.0', port=5000)
+```
+
 ### Async Example
 ```python
 # Python Async Example

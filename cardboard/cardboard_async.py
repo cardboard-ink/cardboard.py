@@ -1,6 +1,6 @@
 import aiohttp, asyncio
 from datetime import datetime
-from cardboard.Exceptions import Forbidden, Unauthorized, NotFound, InternalServerError, RateLimited, CardboardException
+from cardboard.Exceptions import *
 
 
 import aiohttp
@@ -30,6 +30,8 @@ async def _handle_error(response):
         raise InternalServerError(await response.text())
     elif response.status == 429:
         raise RateLimited(await response.text())
+    elif response.status == 400:
+        raise BadRequest(await response.text())
     elif 200 <= response.status < 300:
         return False
     else:
@@ -66,16 +68,22 @@ class CardboardAsync:
                     data={'client_id': self.client_id, 'client_secret': self.secret},
                     headers={'Content-Type': 'application/x-www-form-urlencoded'}
                 ) as response:
-                    return [
+                    r = [
                         True,
                         (await response.json()).get('name'),
                         (await response.json()).get('vanity')
                     ] if response.status == 200 else False
+            return r
 
     
         self.__check_verify = lambda: __check_verify(self)
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
 
-        self._valid = asyncio.run_coroutine_threadsafe(self.__check_verify(), asyncio.get_event_loop())
+        self._valid = loop.run_until_complete(self.__check_verify())
         if self._valid is False:
             raise CardboardException("Invalid credentials provided. (Is your ID and Secret correct?)")
         self.app_name = self._valid[1]
@@ -213,6 +221,17 @@ class CardboardAsync:
             async with self._session.post(url, data=data, headers=headers) as response:
                 return response
 
+    async def _async_session_request_get_(self, url, data=None, headers=None):
+        """
+        Makes a get request.
+        """
+        if not headers:
+            async with self._session.get(url, data=data) as response:
+                return response
+        else:
+            async with self._session.get(url, data=data, headers=headers) as response:
+                return response
+
     async def get_token(self, code:str) -> AuthToken:
         """
         Exchanges your initial code for an authorization token.
@@ -275,7 +294,22 @@ class CardboardAsync:
             token (str): Your authorization token.
         """
         headers = {"Authorization": f"Bearer {token}"}
-        response = await self._async_session_request_post_(f"{self._baseurl}/users/@me", headers=headers)
+        response = await self._async_session_request_get_(f"{self._baseurl}/users/@me", headers=headers)
         if response.status != 200:
             await _handle_error(response)
         return self.User(await response.json())
+
+    async def check_token(self, token:str) -> bool:
+        """
+        Checks whether a token is valid or not.
+
+        Args:
+            token (str): Your authorization token.
+        """
+        data = {
+            "token": token
+        }
+        response = await self._async_session_request_post_(f"{self._baseurl}/token/check", data=data)
+        if response.status != 200:
+            await _handle_error(response)
+        return (await response.json())["validity"]

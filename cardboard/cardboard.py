@@ -1,6 +1,6 @@
 import requests
 from datetime import datetime
-from cardboard.Exceptions import Forbidden, Unauthorized, NotFound, InternalServerError, RateLimited, CardboardException
+from cardboard.Exceptions import *
 
 
 def _handle_error(response):
@@ -28,6 +28,8 @@ def _handle_error(response):
         raise InternalServerError(f"{response.content.decode()}")
     elif response.status_code == 429:
         raise RateLimited(f"{response.content.decode()}")
+    elif response.status_code == 400:
+        raise BadRequest(f"{response.content.decode()}")
     elif 200 <= response.status_code < 300:
         return False
     else:
@@ -254,7 +256,22 @@ class Cardboard:
             token (str): Your authorization token.
         """
         headers = {"Authorization": f"Bearer {token}"}
-        response = self._session.post(f"{self._baseurl}/users/@me", headers=headers)
+        response = self._session.get(f"{self._baseurl}/users/@me", headers=headers)
         if response.status_code != 200:
             _handle_error(response)
         return self.User(response.json())
+
+    def check_token(self, token:str) -> bool:
+        """
+        Checks whether a token is valid or not.
+
+        Args:
+            token (str): Your authorization token.
+        """
+        data = {
+            "token": token
+        }
+        response = self._session.post(f"{self._baseurl}/token/check", data=data)
+        if response.status_code != 200:
+            _handle_error(response)
+        return response.json()["validity"]

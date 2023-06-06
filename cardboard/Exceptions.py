@@ -43,9 +43,18 @@ class RateLimited(CardboardException):
     """
     pass
 
+class BadRequest(CardboardException):
+    """
+    Exception raised when a bad request is sent.
+
+    Likely invalid data was posted.
+    """
+    pass
+
 
 CardboardForbidden = Forbidden
 CardboardUnauthorized = Unauthorized
 CardboardNotFound = NotFound
 CardboardInternalServerError = InternalServerError
 CardboardRateLimited = RateLimited
+CardboardBadRequest = BadRequest
