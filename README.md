@@ -19,6 +19,8 @@ You can now use the client to make requests.
 ### Examples
 These examples will use Flask. Install it with `pip install Flask`
 
+Flask is included with `cardboard.py>=0.0.8`
+
 ```python
 # Python Example
 from flask import Flask, request, redirect, url_for, session, Response
@@ -49,6 +51,21 @@ def dashboard():
     user = cb.get_user(token)
     return Response(f'{user.name} (user id {user.id})', mimetype='text/plain')
 
+@app.route('/')
+def home():
+    html = f'<html><head><title>Button Redirect</title></head><body><button onclick="window.location.href=\'{url_for("login")}\';">Login</button></body></html>'
+    return Response(html, mimetype='text/html')
+
+@app.route('/logout')
+def logout():
+    b = session.pop('cardboard_token', None)
+    if b:
+        try:
+            cb.revoke_token(b)
+        except:
+            pass
+    return redirect(url_for('home'))
+
 if __name__ == '__main__':
     app.run('0.0.0.0', port=5000)
 ```
@@ -66,18 +83,23 @@ cb.fi = FlaskIntegration(app=app, cardboard=cb) # make this class ONLY AFTER YOU
 @app.route('/login')
 @cb.fi.autologin
 def login(token):
-    session['cardboard_token'] = token.token
     return redirect(url_for('dashboard'))
 
 @app.route('/dashboard')
-@cb.fi.logged_in('cardboard_token', check=True)
-def dashboard(token:str):
-    # v = cb.check_token(token)
-    # if not v:
-    #     return redirect(cb.app_url)
-    # uncomment above code if check=False
-    user = cb.get_user(token)
+@cb.fi.logged_in
+def dashboard(token):
+    user = cb.get_user(token.token)
     return Response(f'{user.name} (user id {user.id})', mimetype='text/plain')
+
+@app.route('/')
+def home():
+    html = f'<html><head><title>Button Redirect</title></head><body><button onclick="window.location.href=\'{url_for("login")}\';">Login</button></body></html>'
+    return Response(html, mimetype='text/html')
+
+@app.route('/logout')
+@cb.fi.autologout
+def logout():
+    return redirect(url_for('home'))
 
 if __name__ == '__main__':
     app.run('0.0.0.0', port=5000)
@@ -89,7 +111,7 @@ if __name__ == '__main__':
 ```
 
 # Documentation
-For detailed documentation on the Cardboard API, read https://www.guilded.gg/CardBoard/groups/3y446Rmz/channels/4539a4f9-fb51-4a23-b01-0fcaeaf062d3/docs/374610
+For detailed documentation on the Cardboard API, read https://www.guilded.gg/CardBoard/groups/3y446Rmz/channels/4539a4f9-fb51-4a23-b014-0fcaeaf062d3/docs/374610
 
 For detailed documentation on how to use the cardboard.py library, please wait while we write it lol.
 
@@ -146,6 +168,14 @@ A list of methods/attributes you can call with either Cardboard or CardboardAsyn
         - `._raw` (dict)
     - `.userTransientStatus` (str|None)
     - `._raw` (dict)
+- `.check_token(token:str)` (bool)
+
+### FlaskIntegration
+- `@logged_in`
+- `@autologin`
+- `@autologout`
+- `@login_autoexchange` **DEPRECATED**
+- `@login_code` **DEPRECATED**
 
 # License
 This project is licensed under the MIT License. See the LICENSE file for details.
