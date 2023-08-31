@@ -1,5 +1,6 @@
 import requests
 from datetime import datetime
+from dateutil import parser
 from cardboard.Exceptions import *
 
 
@@ -99,9 +100,9 @@ class Cardboard:
             self.alias:str|None = data["alias"]
             self.discriminator:str|None = data["discriminator"]
             self.name:str = data["name"]
-            self.createdAt:datetime = datetime.fromisoformat(data["createdAt"])
+            self.createdAt:datetime = parser.isoparse(data["createdAt"])
             self._raw_createdAt:str = data["createdAt"]
-            self.editedAt:datetime = datetime.fromisoformat(data["editedAt"])
+            self.editedAt:datetime = parser.isoparse(data["editedAt"])
             self._raw_editedAt:str = data["editedAt"]
             self.userId:str = data["userId"]
             self.gameId:int = data["gameId"]
@@ -121,9 +122,14 @@ class Cardboard:
             _raw (dict): The raw API data.
         """
         def __init__(self, data):
-            self.bio:str|None = data.get("bio")
-            self.tagline:str|None = data.get("tagLine")
-            self._raw:dict = data
+            if data:
+                self.bio:str|None = data.get("bio")
+                self.tagline:str|None = data.get("tagLine")
+                self._raw:dict = data
+            else:
+                self.bio:str|None = None
+                self.tagline:str|None = None
+                self._raw:dict = {}
 
     class UserStatus:
         """

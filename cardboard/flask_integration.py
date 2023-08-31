@@ -1,7 +1,7 @@
 from flask import request, Flask, redirect, session
 from functools import wraps
 from cardboard import Cardboard, CardboardAsync
-import aiohttp, asyncio, time, warnings, secrets
+import aiohttp, asyncio, time, warnings
 import concurrent.futures
 
 class FlaskIntegration:

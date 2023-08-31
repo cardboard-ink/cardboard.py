@@ -1,6 +1,8 @@
-import aiohttp, asyncio
+import aiohttp, asyncio, requests # ah yes, requests.
 from datetime import datetime
+from dateutil import parser
 from cardboard.Exceptions import *
+import concurrent.futures # threading HEHE
 
 
 import aiohttp
@@ -54,36 +56,21 @@ class CardboardAsync:
         self.app_name:str = None
         self._session = aiohttp.ClientSession(headers={"Content-Type": "application/x-www-form-urlencoded"})
 
-        async def __check_verify(self) -> bool|list:
+        def __check_verify(self) -> bool|list:
             """
             Verifies authentication data. ID and Secret.
 
             Returns:
                 bool|list: [True, app_name, app_vanity] if everything is valid, else False.
             """
-            url = self._baseurl + '/check'
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    url,
-                    data={'client_id': self.client_id, 'client_secret': self.secret},
-                    headers={'Content-Type': 'application/x-www-form-urlencoded'}
-                ) as response:
-                    r = [
-                        True,
-                        (await response.json()).get('name'),
-                        (await response.json()).get('vanity')
-                    ] if response.status == 200 else False
-            return r
+            resp = requests.post(self._baseurl+'/check', headers={'Content-Type': 'application/x-www-form-urlencoded'}, data={'client_id': self.client_id, 'client_secret': self.secret})
+            if resp.status_code != 200:
+                return False
+            return [True, resp.json()['name'], resp.json()['vanity']]
 
     
         self.__check_verify = lambda: __check_verify(self)
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        self._valid = loop.run_until_complete(self.__check_verify())
+        self._valid = concurrent.futures.ThreadPoolExecutor().submit(lambda: self.__check_verify()).result()
         if self._valid is False:
             raise CardboardException("Invalid credentials provided. (Is your ID and Secret correct?)")
         self.app_name = self._valid[1]
@@ -115,9 +102,9 @@ class CardboardAsync:
             self.alias:str|None = data["alias"]
             self.discriminator:str|None = data["discriminator"]
             self.name:str = data["name"]
-            self.createdAt:datetime = datetime.fromisoformat(data["createdAt"])
+            self.createdAt:datetime = parser.isoparse(data["createdAt"])
             self._raw_createdAt:str = data["createdAt"]
-            self.editedAt:datetime = datetime.fromisoformat(data["editedAt"])
+            self.editedAt:datetime = parser.isoparse(data["editedAt"])
             self._raw_editedAt:str = data["editedAt"]
             self.userId:str = data["userId"]
             self.gameId:int = data["gameId"]
@@ -137,9 +124,14 @@ class CardboardAsync:
             _raw (dict): The raw API data.
         """
         def __init__(self, data):
-            self.bio:str|None = data.get("bio")
-            self.tagline:str|None = data.get("tagLine")
-            self._raw:dict = data
+            if data:
+                self.bio:str|None = data.get("bio")
+                self.tagline:str|None = data.get("tagLine")
+                self._raw:dict = data
+            else:
+                self.bio:str|None = None
+                self.tagline:str|None = None
+                self._raw:dict = {}
 
     class UserStatus:
         """
